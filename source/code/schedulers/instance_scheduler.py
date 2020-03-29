@@ -38,6 +38,7 @@ INF_PROCESSING_ACCOUNT = "Running {} scheduler for account {}{} in region(s) {}"
 INF_STARTING_INSTANCES = "Starting instances {} in region {}"
 INF_STOPPED_INSTANCES = "Stopping instances {} in region {}"
 INF_MAINTENANCE_WINDOW = "Maintenance window \"{}\" used as running period found for instance {}"
+INF_EXIT_STANDBY_INSTANCES = "Exiting standby for instances {} in region {}"
 
 INF_DO_NOT_STOP_RETAINED_INSTANCE = "Instance {} was already running at start of period and schedule uses retain option, desired " \
                                     "state set to {} but instance will not be stopped if it is still running."
@@ -80,6 +81,7 @@ class InstanceScheduler:
         self._scheduler_start_list = []
         self._scheduler_stop_list = []
         self._schedule_resize_list = []
+        self._scheduler_exit_standby_list = []
         self._scheduler_configuration = scheduler_configuration
         self._stack_name = os.getenv(configuration.ENV_STACK, "")
         self._lambda_account = os.getenv(configuration.ENV_ACCOUNT)
@@ -89,7 +91,7 @@ class InstanceScheduler:
         # valid regions for service
         self._valid_regions = boto3.Session().get_available_regions(service.service_name)
 
-        self._usage_metrics = {"Started": {}, "Stopped": {}, "Resized": {}}
+        self._usage_metrics = {"Started": {}, "Stopped": {}, "Resized": {}, "Exited Standby": {}}
 
     @property
     def _regions(self):
@@ -288,7 +290,7 @@ class InstanceScheduler:
                                 resp_window_executions = {}
                             execution_list.extend(resp_window_executions.get('WindowExecutions', []))
                             next_token = resp_window_executions.get('NextToken', None)
-                        
+
                         for item in execution_list:
                             start_time_list.append(item['StartTime'])
                         if len(start_time_list):
@@ -315,6 +317,7 @@ class InstanceScheduler:
         started_instances = {}
         stopped_instances = {}
         resized_instances = {}
+        exited_standby_instances = {}
 
         self._logger.info(INF_PROCESSING_ACCOUNT,
                           self._service.service_name.upper(), account.name, " using role " + account.role if account.role else "",
@@ -330,6 +333,7 @@ class InstanceScheduler:
             self._scheduler_start_list = []
             self._scheduler_stop_list = []
             self._schedule_resize_list = []
+            self._scheduler_exit_standby_list = []
 
             for instance in self._scheduled_instances_in_region(account, region):
 
@@ -415,6 +419,9 @@ class InstanceScheduler:
             if len(self._schedule_resize_list) > 0:
                 resized_instances[region] = [{i[0].id: {"schedule": i[0].schedule_name, "old": i[0].instancetype, "new": i[1]}} for
                                              i in self._schedule_resize_list]
+            if len(self._scheduler_exit_standby_list) > 0:
+                exited_standby_instances[region] = [{i.id: {"schedule": i.schedule_name}} for i in self._scheduler_exit_standby_list]
+
             if allow_send_metrics():
                 self._collect_usage_metrics()
 
@@ -426,6 +433,8 @@ class InstanceScheduler:
         result = {"started": started_instances, "stopped": stopped_instances}
         if self._service.allow_resize:
             result["resized"] = resized_instances
+        if self._service.supports_standby:
+            result["exited_standby"] = exited_standby_instances
         return result
 
     def _send_usage_metrics(self):
@@ -470,6 +479,12 @@ class InstanceScheduler:
                 self._usage_metrics["Resized"][type_change] += 1
             else:
                 self._usage_metrics["Resized"][type_change] = 1
+
+        for i in self._scheduler_exit_standby_list:
+            if i.instancetype in self._usage_metrics["Exited Standby"]:
+                self._usage_metrics["Exited Standby"][i.instancetype] += 1
+            else:
+                self._usage_metrics["Exited Standby"][i.instancetype] = 1
 
     # handle new state of an instance
     def _process_new_desired_state(self, account, region, instance, desired_state, desired_type, last_desired_state,
@@ -537,8 +552,10 @@ class InstanceScheduler:
 
                 # instance already running with desired state of running
                 else:
+                    if last_desired_state == InstanceSchedule.STATE_STANDBY:
+                        self._scheduler_exit_standby_list.append(instance)
                     # if retain running option is used in this save desired state as retained running.
-                    if last_desired_state == InstanceSchedule.STATE_STOPPED:
+                    elif last_desired_state == InstanceSchedule.STATE_STOPPED:
                         if retain_running:
                             self._logger.debug(DEBUG_APPLY_RETAIN_RUNNING_STATE, desired_state, instance.id,
                                                InstanceSchedule.STATE_RETAIN_RUNNING)
@@ -556,6 +573,7 @@ class InstanceScheduler:
                     # append instance to list of instances to start
                     if desired_state == InstanceSchedule.STATE_STOPPED_FOR_RESIZE:
                         instance = instance._replace(resized = True)
+                    # append instance to list of instances to stop
                     self._scheduler_stop_list.append(instance)
                     # stopped instance with desired state of running but in retained state mode
                     # (manually stopped in running period and already running at start)
@@ -603,5 +621,23 @@ class InstanceScheduler:
                 schedulers.PARAM_STACK: self._stack_name,
                 schedulers.PARAM_CONFIG: self._scheduler_configuration
             }):
-                # set state based on start of stop action
+                # set state based on returned state from stop action
+                self._instance_states.set_instance_state(inst_id, state)
+
+        if len(self._scheduler_exit_standby_list) > 0:
+            self._logger.info(INF_EXIT_STANDBY_INSTANCES,
+                              ", ".join([i.instance_str for i in self._scheduler_exit_standby_list]),
+                              region)
+            for inst_id, state in self._service.exit_standby_instances(**{
+                schedulers.PARAM_SESSION: account.session,
+                schedulers.PARAM_ACCOUNT: account.name,
+                schedulers.PARAM_ROLE: account.role,
+                schedulers.PARAM_REGION: region,
+                schedulers.PARAM_TRACE: self._configuration.trace,
+                schedulers.PARAM_EXITED_STANDBY_INSTANCES: self._scheduler_exit_standby_list,
+                schedulers.PARAM_LOGGER: self._logger,
+                schedulers.PARAM_CONTEXT: self._context,
+                schedulers.PARAM_STACK: self._stack_name,
+                schedulers.PARAM_CONFIG: self._scheduler_configuration
+            }):
                 self._instance_states.set_instance_state(inst_id, state)

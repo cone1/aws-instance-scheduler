@@ -32,6 +32,8 @@ INST_MAINTENANCE_WINDOW = "maintenance_window"
 INST_ENGINE_TYPE = "engine_type"
 INST_DB_ARN = "db_inst_arn"
 INST_DB_IS_CLUSTER = "is_cluster"
+INST_ASG = "asg_name"
+INST_ASG_LIFECYCLE_STATE = 'asg_lifecycle_state'
 
 PARAM_ACCOUNT = "account"
 PARAM_CONTEXT = "context"
@@ -43,6 +45,7 @@ PARAM_ROLE = "role"
 PARAM_SESSION = "session"
 PARAM_STARTED_INSTANCES = "started_instances"
 PARAM_STOPPED_INSTANCES = "stopped_instances"
+PARAM_EXITED_STANDBY_INSTANCES = "exited_standby_instances"
 PARAM_TAG_NAME = "tagname"
 PARAM_TRACE = "trace"
 PARAM_STACK = "stack_name"
@@ -64,4 +67,3 @@ def account_from_role(role_str):
     if len(role_elements) < 5:
         return ""
     return role_elements[4]
-

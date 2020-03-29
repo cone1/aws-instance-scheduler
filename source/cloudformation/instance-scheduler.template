@@ -764,7 +764,7 @@
                         "Sid": "default",
                         "Effect": "Allow",
                         "Principal": {
-                            "AWS": { 
+                            "AWS": {
                                 "Fn::Sub": "arn:${AWS::Partition}:iam::${AWS::AccountId}:root"
                             }
                         },
@@ -1104,6 +1104,14 @@
                                     ]
                                 }
                             ]
+                        }, {
+                            "Effect": "Allow",
+                            "Action": [
+                                "autoscaling:DescribeAutoScalingInstances",
+                                "autoscaling:ExitStandby",
+                                "autoscaling:EnterStandby"
+                            ],
+                            "Resource": "*"
                         }
                     ]
                 }
