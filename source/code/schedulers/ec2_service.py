@@ -216,7 +216,7 @@ class Ec2Service:
                 # determine if its one we can schedule, then add the asg_name & lifecycle to it
                 instance = {}
                 try:
-                    instance = (ec2_inst for ec2_inst in instances if ec2_inst["id"] == asg_inst["InstanceId"]).next()
+                    instance = (ec2_inst for ec2_inst in instances if ec2_inst["id"] == asg_inst["InstanceId"]).__next__()
                 except StopIteration:
                     pass
                 if instance:
@@ -362,7 +362,7 @@ class Ec2Service:
             schedulers.INST_CURRENT_STATE: InstanceSchedule.STATE_RUNNING if is_running else InstanceSchedule.STATE_STOPPED,
             schedulers.INST_INSTANCE_TYPE: instance["InstanceType"],
             schedulers.INST_TAGS: tags,
-            schedulers.INST_MAINTENANCE_WINDOW: maintenance_window_schedule
+            schedulers.INST_MAINTENANCE_WINDOW: maintenance_window_schedule,
             schedulers.INST_ASG: None,
             schedulers.INST_ASG_LIFECYCLE_STATE: None
         }
@@ -635,7 +635,7 @@ class Ec2Service:
                         asg_instance = {}
                         try:  # match instance to object in instance_batch
                             asg_instance = (ec2_inst for ec2_inst in instance_batch if
-                                        ec2_inst.id == started_instance["InstanceId"]).next()
+                                        ec2_inst.id == started_instance["InstanceId"]).__next__()
                         except StopIteration:
                             pass
                         if asg_instance != {} and asg_instance.asg_lifecycle_state == "Standby":

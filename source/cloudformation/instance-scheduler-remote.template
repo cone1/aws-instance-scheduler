@@ -174,12 +174,20 @@
                                     "Resource": [
                                         "*"
                                     ]
-                                }, {
+                                },
+                                {
                                     "Effect": "Allow",
                                     "Action": [
                                         "autoscaling:DescribeAutoScalingInstances",
                                         "autoscaling:ExitStandby",
                                         "autoscaling:EnterStandby"
+                                    ],
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "kms:CreateGrant"
                                     ],
                                     "Resource": "*"
                                 }

@@ -2,13 +2,38 @@
 
 ## Description
 
-Scheduler for Cross-Account and Cross-Region scheduling for EC2 and RDS instances
+Scheduler for Cross-Account and Cross-Region start/stop scheduling for EC2 and RDS instances
+
+Merged from AWS Original & DanielRedOaks ASG Patch
+- Instance Scheduler 1.3.1
+- Python 3.7
+- Aurora RDS support
+- KMS support
+- ASG Patch
+
 
 ## Setup
 
-Deploys from Cloudformation template generate by makefile
-Sample make command: `make bucket=solutions-test-reference solution=aws-instance-scheduler version=1.2.1`
+```
+# Requirements
 
+$ pip3.7 install certifi chardet idna pytz requests urllib3 -t code/
+
+
+# Build
+
+$ cd deployment
+$ ./build-s3-dist.sh ischeduler-release-bucket ischeduler 1.3.1-asg
+
+
+# Deploy
+
+- Copy Lambda instance-scheduler.zip to S3
+- Deploy CFN to service account & remote accounts
+- Create schedules & Tag instances
+
+https://docs.aws.amazon.com/solutions/latest/instance-scheduler/
+```
 
 ***
 

@@ -306,7 +306,7 @@ class RdsService:
             schedulers.INST_TAGS: tags,
             schedulers.INST_NAME: tags.get("Name", ""),
             schedulers.INST_SCHEDULE: tags.get(self._tagname, None),
-            schedulers.INST_DB_IS_CLUSTER: is_cluster
+            schedulers.INST_DB_IS_CLUSTER: is_cluster,
             schedulers.INST_ASG: None,
             schedulers.INST_ASG_LIFECYCLE_STATE: None
         }
